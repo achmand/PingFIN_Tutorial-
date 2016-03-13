@@ -1,0 +1,36 @@
+CREATE OR REPLACE TRIGGER checkPayments
+BEFORE INSERT ON tbl_payments
+FOR EACH ROW 
+DECLARE 
+    v_message VARCHAR(100 CHAR);
+        v_is_valid CHAR(1) := 'N';
+BEGIN 
+		
+    IF getActiveUser(getOrderUsername(:new.order_id)) = 0 
+    THEN v_message := 'Invalid account';
+    END IF;
+
+    IF isValidAmount(:new.payment_amount) = 0
+    THEN v_message := v_message || ' Invalid amount';
+    END IF;
+
+    IF checkOrderExist(:new.order_id) = 0 
+    THEN v_message := v_message || ' Invalid order ID';
+    END IF;
+
+    IF (getValidOrderPayments(:new.order_id) + :new.payment_amount ) > getOrderTotal(:new.order_id)
+    THEN  v_message := v_message || ' Payment exceeds total';
+    END IF;
+	
+	IF v_message IS NULL 
+	THEN v_message := 'OK'; 
+         v_is_valid := 'Y';
+    END IF;
+
+    :new.payment_id:= seq_payment_id.nextval;
+    :new.payment_date:= LOCALTIMESTAMP;
+    :new.payment_message := trim(v_message);
+    :new.is_valid := v_is_valid;
+
+END;
+/
